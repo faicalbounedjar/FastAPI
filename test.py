@@ -20,10 +20,8 @@ def get_model():
 
 tokenizer, model = get_model()
 modelML=AutoModelForCausalLM.from_pretrained("bounedjarr/sgpt-finetuned-natcat")
-queries=["I'm searching for a planet not too far from Earth."]
-docs=["Neptune is the eighth and farthest-known Solar planet from the Sun. In the Solar System, it is the fourth-largest planet by diameter, the third-most-massive planet, and the densest giant planet. It is 17 times the mass of Earth, slightly more massive than its near-twin Uranus.",
-    "TRAPPIST-1d, also designated as 2MASS J23062928-0502285 d, is a small exoplanet (about 30% the mass of the earth), which orbits on the inner edge of the habitable zone of the ultracool dwarf star TRAPPIST-1 approximately 40 light-years (12.1 parsecs, or nearly 3.7336×1014 km) away from Earth in the constellation of Aquarius.",
-    "A harsh desert world orbiting twin suns in the galaxy’s Outer Rim, Tatooine is a lawless place ruled by Hutt gangsters. Many settlers scratch out a living on moisture farms, while spaceport cities such as Mos Eisley and Mos Espa serve as home base for smugglers, criminals, and other rogues."]
+queries=[]
+docs=[]
 #adding a queries
 @app.post("/insert_queries")
 def insert_queries(text:str):
@@ -100,7 +98,20 @@ def get_weightedmean_embedding(batch_tokens, model):
     embeddings = sum_embeddings / sum_mask
 
     return embeddings
-
+def get_cosine_similarities(query_embeddings, doc_embeddings):
+    similarities = []
+    for query_emb in query_embeddings:
+        query_sims = []
+        for doc_emb in doc_embeddings:
+            sim = 1 - cosine(query_emb, doc_emb)
+            query_sims.append(sim)
+        similarities.append(query_sims)
+    return similarities
+def assign_scores_to_docs(docs, similarities):
+    result = []
+    for i, doc in enumerate(docs):
+        result.append({doc: similarities[0][i]})
+    return result
 #biencoder
 @app.get("/resultsBE")
 def get_embedding():
@@ -109,14 +120,19 @@ def get_embedding():
     doc_embeddings = get_weightedmean_embedding(tokenize_with_specb(docs, is_queries=False), model)
     # Calculate cosine similarities
     # Cosine similarities are in [-1, 1]. Higher means more similar
-    cosine_sim_0_1 = 1 - cosine(queries_embeddings[0], doc_embeddings[0])
-    cosine_sim_0_2 = 1 - cosine(queries_embeddings[0], doc_embeddings[1])
-    cosine_sim_0_3 = 1 - cosine(queries_embeddings[0], doc_embeddings[2])
+    results =assign_scores_to_docs(docs, get_cosine_similarities(queries_embeddings, doc_embeddings))
 
-    return {"Cosine similarity between "+queries[0]+" and "+docs[0]+"":(cosine_sim_0_1)}
+    return sorted(results, key=lambda x: list(x.values())[0], reverse=True)
 
 prompt = 'Documents are searched to find matches with the same content.\nThe document "{}" is a good search result for "'
+
 result=[]
+def sort_query_results(query_results):
+    for query in query_results:
+        results = query['results']
+        results.sort(key=lambda x: float(x['Score']))
+    return query_results
+
 @app.get("/resultsCE")
 def get_results():
     modelML.eval()
@@ -143,7 +159,8 @@ def get_results():
             print(f" ")
             document_results.append({"document":doc,"Score":f" {score}"})
         result.append({"queries" : query , "results" : document_results})
-    return result
+    sort_query_results(result)
+    return result[::-1]
 
 if __name__ == "__main__":
     uvicorn.run("test:app", host='127.0.0.1', port=8000, reload=True)
