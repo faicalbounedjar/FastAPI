@@ -1,7 +1,6 @@
 import torch
 from fastapi import FastAPI, Request
 import uvicorn
-#from scipy.spatial.distance import cosine
 from transformers import AutoModel,AutoModelForCausalLM, AutoTokenizer
 import mysql.connector
 import json
@@ -17,14 +16,7 @@ dbcon = mysql.connector.connect(
 mycursor = dbcon.cursor()
 app = FastAPI()
 
-
-# @app.get("/")
-# def read_root():
-#     return {
-#         "queries": queries,
-#         "docs":docs
-#     }
-
+# model loading
 def get_model():
     tokenizer = AutoTokenizer.from_pretrained("bounedjarr/sgpt-finetuned-natcat")
     model = AutoModel.from_pretrained("bounedjarr/sgpt-finetuned-natcat")
@@ -34,24 +26,7 @@ tokenizer, model = get_model()
 
 modelML=AutoModelForCausalLM.from_pretrained("bounedjarr/sgpt-finetuned-natcat")
 
-# queries=[]
-# docs=[]
-# #adding a queries
-# @app.post("/insert_queries")
-# def insert_queries(text:str):
-#     if(text!=""):
-#         queries.append(text)
-#         return {
-#             "message":"text inserted succesfully to the queries",
-#             "text inserted ": text,
-#             "results after insert":queries
-#         }
-#     else: 
-#         return { "ERROR":"Failed to add the text because it was empty",}
-
-
-#get docs
-@app.get("/get_docs")
+# geting all the documents
 def get_all_docs():
     sql = "SELECT video_id,video_embedding FROM `embedding`"
     mycursor.execute(sql)
@@ -60,6 +35,7 @@ def get_all_docs():
 
 listt=get_all_docs()
 all = []
+#fixing the format of the list 
 for result in listt:
     id = result[0]
     json_str = result[1]
@@ -68,10 +44,9 @@ for result in listt:
     all.append((id, x))
 ids = [x[0] for x in all]
 docs = [x[1] for x in all]
-print(docs)
 
 
-
+# encoding the spec tokens
 SPECB_QUE_BOS = tokenizer.encode("[", add_special_tokens=False)[0]
 SPECB_QUE_EOS = tokenizer.encode("]", add_special_tokens=False)[0]
 
@@ -129,7 +104,7 @@ def get_weightedmean_embedding(batch_tokens, model):
     return embeddings
 
 
-# Get Embedding
+# Get Embedding and upload them to the db
 @app.post("/embedding/text")
 async def get_embedding(id: int, title: str , desc: str):
     text = title + ' : ' + desc
@@ -145,34 +120,48 @@ async def get_embedding(id: int, title: str , desc: str):
     dbcon.commit()
     return {"status" : "success"}
 
-
+#calculating the cosim
 def get_cosine_similarities(query_embeddings, doc_embeddings):
     similarities = []
-    for query_emb in query_embeddings:
-        query_sims = []
-        for doc_emb in doc_embeddings:
-            sim = 1 - cosine(query_emb, doc_emb)
-            query_sims.append(sim)
-        similarities.append(query_sims)
+    for doc_emb in doc_embeddings:
+        sim = 1 - cosine(query_embeddings[0], doc_emb)
+        similarities.append(sim)
     return similarities
-def assign_scores_to_docs(docs, similarities):
+#assign the top docs to thier corespading ids
+def assign_scores_to_docs(ids, similarities):
     result = []
-    for i, doc in enumerate(docs):
-        result.append({doc: similarities[0][i]})
+    for i, id in enumerate(ids):
+        if(similarities[i]>0.45):
+            result.append({id: similarities[i]})
     return result
 
+#fix the format of the embeddings
+concatenated_array = []
+for arr in docs:
+    concatenated_array += arr
+docs=concatenated_array
 
-#biencoder
+# get the results ids 
+def extract_ids(lst):
+    y=[]
+    for i in lst:
+        for x in i.keys():
+            y.append(x)
+    return y
+
+#biencoder search
 @app.get("/search")
-def get_embedding():
-    
+def get_embedding(text:str):
+    queries = []
+    queries.append(text)
     queries_embeddings = get_weightedmean_embedding(tokenize_with_specb(queries, is_queries=True), model)
-    doc_embeddings = get_weightedmean_embedding(tokenize_with_specb(docs, is_queries=False), model)
+    doc_embeddings = docs
     # Calculate cosine similarities
     # Cosine similarities are in [-1, 1]. Higher means more similar
-    results =assign_scores_to_docs(docs, get_cosine_similarities(queries_embeddings, doc_embeddings))
-
-    return sorted(results, key=lambda x: list(x.values())[0], reverse=True)
+    results =assign_scores_to_docs(ids, get_cosine_similarities(queries_embeddings, doc_embeddings))
+    x= sorted(results, key=lambda x: list(x.values())[0], reverse=True)
+    k=extract_ids(x)
+    
 
 # prompt = 'Documents are searched to find matches with the same content.\nThe document "{}" is a good search result for "'
 
