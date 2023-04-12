@@ -87,14 +87,14 @@ def get_weightedmean_embedding(batch_tokens, model):
 # Get Embedding and upload them to the db
 @app.post("/embedding/text")
 async def get_embedding(id: int, title: str , desc: str):
-    text = title + ' : ' + desc
+    text = title.lower() + ' [SEP] ' + desc.lower()
     doc = []
-    doc.append(text.lower())
+    doc.append(text)
     embedding = get_weightedmean_embedding(tokenize_with_specb(doc, is_queries=False), model)
     x_np = embedding.numpy()
     x_str = json.dumps(x_np.tolist())
     sql = "INSERT INTO `embedding`(`video_id`, `video_text`, `video_embedding`) VALUES (%s,%s,%s)"
-    val = (id, text.lower(), x_str)
+    val = (id, text, x_str)
     mycursor.execute(sql,val)
     dbcon.commit()
     return {"status" : "success"}
