@@ -96,7 +96,7 @@ def get_weightedmean_embedding(batch_tokens, model):
     return embeddings
 
 
-# Get Embedding and upload them to the db
+# Get Embedding and upload them to the database
 @app.post("/embedding/text")
 async def get_embedding(id: int, title: str , desc: str):
     text = title.lower() + ' . ' + desc.lower()
@@ -168,7 +168,7 @@ def extract_ids(lst):
             y.append(x)
     return y
 
-# BiEncoder search
+# Get Embedding of search and return ids of videos
 @app.get("/search")
 def get_serach(text:str):
     ids = []
@@ -184,45 +184,8 @@ def get_serach(text:str):
     x= sorted(results, key=lambda x: list(x.values())[0], reverse=True)
     k = extract_ids(x)
     return k
-    
 
-# prompt = 'Documents are searched to find matches with the same content.\nThe document "{}" is a good search result for "'
 
-# result=[]
-# def sort_query_results(query_results):
-#     for query in query_results:
-#         results = query['results']
-#         results.sort(key=lambda x: float(x['Score']))
-#     return query_results
-
-# @app.get("/resultsCE")
-# def get_results():
-#     modelML.eval()
-#     document_results =[]
-#     for query in queries:
-#         for doc in docs:
-#             context = prompt.format(doc)
-
-            # context_enc = tokenizer.encode(context, add_special_tokens=False)
-            # continuation_enc = tokenizer.encode(query, add_special_tokens=False)
-            # Slice off the last token, as we take its probability from the one before
-            # model_input = torch.tensor(context_enc+continuation_enc[:-1])
-            # continuation_len = len(continuation_enc)
-            # input_len, = model_input.shape
-
-            # [seq_len] -> [seq_len, vocab]
-            # logprobs = torch.nn.functional.log_softmax(modelML(model_input)[0], dim=-1).cpu()
-            # [seq_len, vocab] -> [continuation_len, vocab]
-            # logprobs = logprobs[input_len-continuation_len:]
-            # Gather the log probabilities of the continuation tokens -> [continuation_len]
-            # logprobs = torch.gather(logprobs, 1, torch.tensor(continuation_enc).unsqueeze(-1)).squeeze(-1)
-            # score = torch.sum(logprobs)
-            # The higher (closer to 0), the more similar
-    #         print(f" ")
-    #         document_results.append({"document":doc,"Score":f" {score}"})
-    #     result.append({"queries" : query , "results" : document_results})
-    # sort_query_results(result)
-    # return result[::-1]
-
+# Run Serveur in command line with : python .\main.py
 if __name__ == "__main__":
     uvicorn.run("main:app", host='127.0.0.1', port=8000, reload=True)
