@@ -1,0 +1,5 @@
+Python = 3.7+
+psql (PostgreSQL) == 15.2
+pytorch == 2.0
+uvicorn == 0.22.0
+scipy = 1.11.1
