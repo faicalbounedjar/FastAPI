@@ -6,24 +6,24 @@ import json
 import numpy as np
 from scipy.spatial.distance import cosine
 # ================ MySql ================
-# import mysql.connector
+import mysql.connector
 
-# dbcon = mysql.connector.connect(
-#     host="127.0.0.1",
-#     user="root",
-#     password="",
-#     database="media")
+dbcon = mysql.connector.connect(
+    host="127.0.0.1",
+    user="root",
+    password="",
+    database="media")
 
 # ================ PostgreSQL ================
-import psycopg2
+# import psycopg2
 
-dbcon = psycopg2.connect(
-    host="localhost",
-    database="media",
-    user="postgres",
-    password="0123",
-    port="5432"
-)
+# dbcon = psycopg2.connect(
+#     host="localhost",
+#     database="media",
+#     user="postgres",
+#     password="0123",
+#     port="5432"
+# )
 
 mycursor = dbcon.cursor()
 app = FastAPI()
@@ -106,9 +106,9 @@ async def get_embedding(id: int, title: str , desc: str):
     x_np = embedding.numpy()
     x_str = json.dumps(x_np.tolist())
     # ================ MySql ================
-    # sql = "INSERT INTO `embedding`(`video_id`, `video_text`, `video_embedding`) VALUES (%s,%s,%s)"
+    sql = "INSERT INTO `embedding`(`video_id`, `video_text`, `video_embedding`) VALUES (%s,%s,%s)"
     # ================ PostgreSQL ================
-    sql = "INSERT INTO embedding (video_id, video_text, video_embedding) VALUES (%s,%s,%s)"
+    # sql = "INSERT INTO embedding (video_id, video_text, video_embedding) VALUES (%s,%s,%s)"
     val = (id, text, x_str)
     mycursor.execute(sql,val)
     dbcon.commit()
@@ -117,9 +117,9 @@ async def get_embedding(id: int, title: str , desc: str):
 # Geting all the documents
 def get_all_docs():
     # ================ MySql ================
-    # sql = "SELECT video_id,video_embedding FROM `embedding`"
+    sql = "SELECT video_id,video_embedding FROM `embedding`"
     # ================ PostgreSQL ================
-    sql = "SELECT video_id,video_embedding FROM embedding"
+    # sql = "SELECT video_id,video_embedding FROM embedding"
     mycursor.execute(sql)
     result = mycursor.fetchall()
     return result
